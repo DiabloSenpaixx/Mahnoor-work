@@ -42,11 +42,9 @@ export async function POST(req: Request) {
 
     let lastError: any = null;
     const fallbackModels = [
-      "gemini-2.5-flash",                                  // Attempt 1: Google SDK
-      "google/gemini-2.0-pro-exp-02-05",                   // Attempt 2: OpenRouter Free
-      "google/gemini-2.0-flash-lite-preview-02-05",        // Attempt 3: OpenRouter Free
-      "meta-llama/llama-3.3-70b-instruct",                 // Attempt 4: OpenRouter Free
-      "qwen/qwen-2.5-coder-32b-instruct",                  // Attempt 5: OpenRouter Free
+      "gemini-2.0-flash-lite-preview-02-05",               // Attempt 1: Google SDK (High Quota)
+      "gemini-2.5-flash",                                  // Attempt 2: Google SDK
+      "gemini-1.5-flash",                                  // Attempt 3: Google SDK
     ];
     const maxRetries = fallbackModels.length;
 

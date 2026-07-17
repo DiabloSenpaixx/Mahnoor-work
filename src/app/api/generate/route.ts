@@ -48,11 +48,9 @@ export async function POST(req: Request) {
 
     let lastError: any = null;
     const fallbackModels = [
-      "gemini-2.5-flash",                                  // Attempt 1: Google SDK
-      "google/gemini-2.0-pro-exp-02-05",                   // Attempt 2: OpenRouter Free
-      "google/gemini-2.0-flash-lite-preview-02-05",        // Attempt 3: OpenRouter Free
-      "meta-llama/llama-3.3-70b-instruct",                 // Attempt 4: OpenRouter Free
-      "qwen/qwen-2.5-coder-32b-instruct",                  // Attempt 5: OpenRouter Free
+      "gemini-2.0-flash-lite-preview-02-05",               // Attempt 1: Google SDK (High Quota)
+      "gemini-2.5-flash",                                  // Attempt 2: Google SDK
+      "gemini-1.5-flash",                                  // Attempt 3: Google SDK
     ];
     const maxRetries = fallbackModels.length;
 
@@ -86,6 +84,9 @@ export async function POST(req: Request) {
           
           text = orData.choices?.[0]?.message?.content || "";
         } else {
+          // Add a small delay for Google SDK to prevent burst 429s
+          if (attempt > 1) await new Promise(resolve => setTimeout(resolve, 2000));
+          
           const ai = getAIInstance(attempt);
           const response = await ai.models.generateContent({
             model: currentModel,
@@ -99,26 +100,33 @@ export async function POST(req: Request) {
           text = response.text || "";
         }
 
-        if (!text) {
-          throw new Error("No response generated.");
-        }
+        const match = text.match(/\{[\s\S]*\}/);
+        if (!match) throw new Error("Invalid JSON format from AI");
+        const jsonStr = match[0].replace(/[\u0000-\u001F]+/g, " ");
         
-        // Ensure no markdown backticks wrap the OpenRouter output
-        if (text.startsWith("\`\`\`json")) text = text.replace(/^\`\`\`json/, "").replace(/\`\`\`$/, "");
+        const data = JSON.parse(jsonStr);
+        if (!data.html || !data.themeColor) throw new Error("Missing required schema fields");
         
-        const data = JSON.parse(text.trim());
         return NextResponse.json(data);
-      } catch (error: any) {
-        console.warn(`Attempt ${attempt} failed for website generation:`, error.message);
-        lastError = error;
-        if (attempt < maxRetries) {
-          // Exponential backoff: 2s, then 4s
-          await new Promise(res => setTimeout(res, 2000 * attempt));
+        
+      } catch (err: any) {
+        lastError = err;
+        console.error(`Attempt ${attempt} (${fallbackModels[attempt-1]}) failed:`, err.message);
+        
+        // If it's the last attempt, we throw a specialized error message for the UI
+        if (attempt === maxRetries) {
+            let finalMsg = lastError?.message || "All models failed.";
+            if (finalMsg.includes("Insufficient credits") || finalMsg.includes("never purchased")) {
+                finalMsg = "OpenRouter requires a credit card on file even for free models. Please generate a new Gemini API key at aistudio.google.com and update Vercel.";
+            } else if (finalMsg.includes("429") || finalMsg.includes("RESOURCE_EXHAUSTED") || finalMsg.includes("quota")) {
+                finalMsg = "Your Gemini API Key has hit its free tier quota limit. Please generate a new free key at aistudio.google.com and update Vercel.";
+            } else if (finalMsg.includes("API key not valid")) {
+                finalMsg = "Your Gemini API Key is invalid. Please double check the key in your Vercel Environment Variables.";
+            }
+            return NextResponse.json({ error: finalMsg }, { status: 500 });
         }
       }
     }
-    
-    throw lastError;
   } catch (error: any) {
     console.error("Error generating website:", error);
     return NextResponse.json({ error: error.message || "Generation failed" }, { status: 500 });
