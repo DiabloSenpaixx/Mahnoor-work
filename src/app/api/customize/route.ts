@@ -43,10 +43,10 @@ export async function POST(req: Request) {
     let lastError: any = null;
     const fallbackModels = [
       "gemini-2.5-flash",                     // Attempt 1: Google SDK (Primary Key)
-      "anthropic/claude-3.5-sonnet",          // Attempt 2: OpenRouter
-      "meta-llama/llama-3.3-70b-instruct",    // Attempt 3: OpenRouter (Fallback to Llama 3.3)
-      "gemini-2.5-flash",                     // Attempt 4: Google SDK (Backup Key)
-      "google/gemini-2.5-flash:free"          // Attempt 5: OpenRouter (Free tier fallback)
+      "google/gemini-2.5-flash",              // Attempt 2: OpenRouter (Suggested slug)
+      "anthropic/claude-3.5-sonnet",          // Attempt 3: OpenRouter
+      "meta-llama/llama-3.3-70b-instruct",    // Attempt 4: OpenRouter
+      "gemini-2.5-pro",                       // Attempt 5: Google SDK
     ];
     const maxRetries = fallbackModels.length;
 
