@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import { ArrowLeft, Wand2, ShieldCheck, AlertCircle, CheckCircle2, ChevronRight, Sparkles, PartyPopper } from "lucide-react";
+import axe from 'axe-core';
 
 const containerVariants: Variants = {
   hidden: {},
@@ -17,44 +18,69 @@ export default function AccessibilityCheck({ onNext, onPrev, generatedSiteData, 
   const [isFixed, setIsFixed] = useState(false);
   const [animatedScore, setAnimatedScore] = useState(0);
   const [issues, setIssues] = useState<any[]>([]);
-  const [passed, setPassed] = useState<any[]>([
-    { title: "Heading Structure", desc: "Headings follow a logical hierarchy." }
-  ]);
+  const [passed, setPassed] = useState<any[]>([]);
   const [baseTargetScore, setBaseTargetScore] = useState(100);
+  const [isChecking, setIsChecking] = useState(true);
   
   const targetScore = isFixed ? 100 : baseTargetScore;
 
   useEffect(() => {
-    if (!generatedSiteData?.html) return;
+    if (!generatedSiteData?.html) {
+      setIsChecking(false);
+      return;
+    }
     const html = generatedSiteData.html;
     
-    // Check for images without alt attributes
-    const missingAlt = (html.match(/<img(?![^>]*\balt=(["'])(?!\1)[^"'>]+)[^>]*>/gi) || []).length;
+    let isMounted = true;
     
-    // Simple heuristic for landmarks
-    const hasNav = /<nav\b/i.test(html);
-    const hasMain = /<main\b/i.test(html);
+    const runAxe = async () => {
+      const container = document.createElement('div');
+      container.innerHTML = html;
+      // We must append to body for axe to check contrast and visibility, but we hide it visually.
+      container.style.position = 'absolute';
+      container.style.left = '-9999px';
+      container.style.top = '-9999px';
+      document.body.appendChild(container);
+      
+      try {
+        const results = await axe.run(container);
+        if (!isMounted) return;
+        
+        const newIssues = results.violations.map(v => ({
+           id: v.id,
+           title: v.help,
+           desc: v.description + " (" + v.nodes.length + " instances)"
+        }));
 
-    let newIssues = [];
-    let newPassed = [{ title: "Heading Structure", desc: "Headings follow a logical hierarchy." }];
+        const newPassed = results.passes.map(p => ({
+           title: p.help,
+           desc: p.description
+        })).slice(0, 5); // Just show top 5 passes to not overwhelm
 
-    if (missingAlt > 0) {
-      newIssues.push({ id: 'alt', title: 'Missing Alt Text', desc: `${missingAlt} image(s) are missing descriptive alternative text.` });
-    } else {
-      newPassed.unshift({ title: 'Alt Text Added', desc: 'All images have alternative text.' });
-    }
-
-    if (!hasNav || !hasMain) {
-      newIssues.push({ id: 'landmarks', title: 'Missing Landmarks', desc: 'Page structure is missing <main> or <nav> tags.' });
-    } else {
-      newPassed.push({ title: 'Semantic Landmarks', desc: 'Page uses proper semantic HTML tags.' });
-    }
-
-    setIssues(newIssues);
-    setPassed(newPassed);
+        setIssues(newIssues);
+        setPassed(newPassed);
+        
+        // Calculate score based on impact and number of violations
+        const penalty = results.violations.reduce((acc, v) => {
+          let p = 5;
+          if (v.impact === 'critical') p = 15;
+          if (v.impact === 'serious') p = 10;
+          return acc + (p * v.nodes.length);
+        }, 0);
+        
+        const calculatedScore = Math.max(0, 100 - penalty);
+        setBaseTargetScore(calculatedScore);
+      } catch (e) {
+        console.error("Axe-core error:", e);
+      } finally {
+        document.body.removeChild(container);
+        if (isMounted) setIsChecking(false);
+      }
+    };
     
-    const calculatedScore = Math.max(50, 100 - (newIssues.length * 15));
-    setBaseTargetScore(calculatedScore);
+    runAxe();
+    
+    return () => { isMounted = false; };
   }, [generatedSiteData]);
 
   useEffect(() => {
