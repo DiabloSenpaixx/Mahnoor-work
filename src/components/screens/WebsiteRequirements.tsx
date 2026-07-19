@@ -227,12 +227,17 @@ export default function WebsiteRequirements({
         
         <motion.button 
           onClick={onNext}
-          className="flex items-center gap-2 px-8 py-3 rounded-full font-bold text-white relative overflow-hidden cta-glow hover:-translate-y-1 transition-all duration-300"
-          whileHover={{ scale: 1.03 }}
-          whileTap={{ scale: 0.97 }}
+          disabled={filledCount < 5}
+          className={`flex items-center gap-2 px-8 py-3 rounded-full font-bold text-white relative overflow-hidden transition-all duration-300 ${
+            filledCount === 5 
+              ? 'cta-glow hover:-translate-y-1' 
+              : 'opacity-60 cursor-not-allowed grayscale'
+          }`}
+          whileHover={filledCount === 5 ? { scale: 1.03 } : {}}
+          whileTap={filledCount === 5 ? { scale: 0.97 } : {}}
         >
           <span className="absolute inset-0 bg-gradient-to-r from-primary via-primary-dark to-primary bg-[length:200%_100%] animate-[shimmer_3s_linear_infinite]" />
-          <span className="relative">Generate Website</span>
+          <span className="relative">{filledCount === 5 ? "Generate Website" : "Fill all fields"}</span>
           <ArrowRight size={20} className="relative" />
         </motion.button>
       </div>
