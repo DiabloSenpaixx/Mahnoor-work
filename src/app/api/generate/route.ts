@@ -48,9 +48,9 @@ export async function POST(req: Request) {
 
     let lastError: any = null;
     const fallbackModels = [
-      "gemini-3.1-flash-lite",                             // Attempt 1: Google SDK (High Quota)
-      "gemini-3.5-flash",                                  // Attempt 2: Google SDK
-      "gemini-3-flash",                                    // Attempt 3: Google SDK
+      "gemini-2.5-flash",                                  // Attempt 1: Google SDK (Best Sweet Spot)
+      "gemini-2.0-flash",                                  // Attempt 2: Google SDK
+      "gemini-1.5-flash",                                  // Attempt 3: Google SDK
     ];
     const maxRetries = fallbackModels.length;
 
